@@ -39,7 +39,11 @@ namespace storage {
 /// @brief Own every argument by value (decay-copy rvalues, copy lvalues).
 ///
 /// Stored values are independent of the caller, so the resulting callable is
-/// reusable and never dangles.
+/// reusable and never dangles. @c std::decay_t is used rather than
+/// @c std::make_tuple deliberately: @c make_tuple *unwraps*
+/// @c std::reference_wrapper into a bare reference, which @c call::move would
+/// then move *through*, stealing from the caller's object. @c decay keeps the
+/// wrapper as an owned value handle, so @c std::ref threads a reference safely.
 struct by_value {
   /// @tparam OriginalTypes Original (possibly reference) argument types, given
   ///                       explicitly to recover their value category.
@@ -48,7 +52,8 @@ struct by_value {
   /// @return A tuple of decayed, owned values.
   template <typename... OriginalTypes, typename... LvalueTypes>
   static auto store(LvalueTypes&... args) {
-    return std::make_tuple(std::forward<OriginalTypes>(args)...);
+    return std::tuple<std::decay_t<OriginalTypes>...>(
+        std::forward<OriginalTypes>(args)...);
   }
 };
 
@@ -97,8 +102,11 @@ using storage::by_value;
 
 // ============================================================================
 
-/// @brief Call policies: how a stored value is delivered to the functor at
-///        invocation time.
+/// @brief Call policies: how a *stored* value (a curried argument or the
+///        functor) is delivered to the functor at invocation time.
+///
+/// Note this governs only stored values. Fresh call-time arguments are always
+/// perfect-forwarded, regardless of the call policy.
 namespace call {
 
 /// @brief Move a stored value into the functor iff its origin was an rvalue.
@@ -197,8 +205,8 @@ struct policy {
   /// @param  functor      Callable to partially apply (kept per @c Target).
   /// @param  curried_args Arguments bound now (kept per @c Storage).
   /// @return A callable that, given the remaining arguments, invokes
-  ///         @p functor with the bound arguments followed by the new ones,
-  ///         each delivered per @c Call.
+  ///         @p functor with the bound arguments (delivered per @c Call)
+  ///         followed by the new ones (always perfect-forwarded).
   // clang-format off
   template <typename Functor, typename... CurriedArgs>
   static auto curry(Functor&& functor, CurriedArgs&&... curried_args) {
@@ -211,7 +219,7 @@ struct policy {
         [&](auto&... stored_curried_args) {
           return Call::template forward<Functor>(std::get<0>(functor))(
             Call::template forward<CurriedArgs>(stored_curried_args)...,
-            Call::template forward<OtherArgs>(other_args)...
+            std::forward<OtherArgs>(other_args)...
           );
         },
         curried_args_as_tuple

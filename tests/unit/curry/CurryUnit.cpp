@@ -3,9 +3,11 @@
 //
 // The three policy axes are exercised independently and in combination:
 //
-//   storage : by_value | as_passed | by_reference  (how curried args are kept)
-//   call    : move      | copy                      (how they reach the functor)
-//   target  : by_value | as_passed | by_reference  (how the functor is kept)
+// clang-format off
+//   storage : by_value | as_passed | by_reference   (how curried args are kept)
+//   call    : move | copy                            (how stored args reach fn)
+//   target  : by_value | as_passed | by_reference    (how the functor is kept)
+// clang-format on
 //
 // A counting Probe makes every copy / move / destruction observable, so the
 // assertions pin down the *exact* value-category behaviour, not just results.
@@ -17,6 +19,7 @@
 
 #include <cstddef>
 #include <functional>
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
@@ -391,15 +394,23 @@ TEST(OtherArgs, MovePolicyLeavesLvaluesAsCopies) {
   EXPECT_EQ(g.copy_ctor - copies, 1);
 }
 
-TEST(OtherArgs, CopyPolicyDowngradesFreshRvaluesToCopies) {
+TEST(OtherArgs, FreshArgsArePerfectForwardedUnderCopyPolicy) {
   Reset();
-  auto curried = own_copy::curry(probe_id);
+  auto curried = own_copy::curry(probe_id);  // copy policy
 
   const int copies = g.copy_ctor;
   const int moves = g.move_ctor;
-  EXPECT_EQ(curried(Probe{8}), 8);  // copy policy passes the call-arg as lvalue
-  EXPECT_EQ(g.copy_ctor - copies, 1);
-  EXPECT_EQ(g.move_ctor - moves, 0);
+  EXPECT_EQ(curried(Probe{8}), 8);     // fresh rvalue is moved, not copied:
+  EXPECT_EQ(g.copy_ctor - copies, 0);  // the call policy governs *stored* args
+  EXPECT_GE(g.move_ctor - moves, 1);   // only, never fresh call-time args
+}
+
+TEST(OtherArgs, MoveOnlyArgWorksUnderEveryCallPolicy) {
+  auto deref = [](std::unique_ptr<int> p) { return *p; };
+  // A move-only call-time argument must be accepted regardless of call policy,
+  // because fresh args are perfect-forwarded, not routed through the policy.
+  EXPECT_EQ(own_move::curry(deref)(std::make_unique<int>(5)), 5);
+  EXPECT_EQ(own_copy::curry(deref)(std::make_unique<int>(7)), 7);
 }
 
 // =============================================================================
@@ -494,4 +505,51 @@ TEST(AllInvariants, EveryCombinationInstantiatesAndRuns) {
   RunInvariant<cs::by_reference, cc::copy, ct::by_value>();
   RunInvariant<cs::by_reference, cc::copy, ct::as_passed>();
   RunInvariant<cs::by_reference, cc::copy, ct::by_reference>();
+}
+
+// =============================================================================
+// 10. reference_wrapper — std::ref is an explicit "borrow by reference" even
+//     through a value-storing policy. The wrapper must be stored as an owned
+//     handle and never moved *through* to the referent, under any call policy.
+//     (Regression: by_value used std::make_tuple, which unwraps the wrapper to
+//     a bare reference that call::move then stole from — see
+//     docs/coverage-proof.)
+// =============================================================================
+
+namespace {
+
+template <typename Policy>
+void CheckRefThreadsAndIsNotStolen() {
+  Probe p{10};
+  auto read_id = [](const Probe& q) { return q.id; };
+  auto curried = Policy::curry(read_id, std::ref(p));
+
+  EXPECT_EQ(curried(), 10);  // the functor sees the referent
+  EXPECT_EQ(p.id, 10);       // and it was NOT moved-from
+}
+
+}  // namespace
+
+TEST(ReferenceWrapper, NotStolenAcrossStorageAndCall) {
+  // std::ref(p) is a prvalue reference_wrapper, so by_reference storage would
+  // dangle (it binds a reference to the temporary wrapper); that combination is
+  // excluded by precondition. Every owning/borrowing-by-value combination must
+  // thread the reference without stealing it.
+  CheckRefThreadsAndIsNotStolen<
+      curry::policy<cs::by_value, cc::move, ct::by_value>>();
+  CheckRefThreadsAndIsNotStolen<
+      curry::policy<cs::by_value, cc::copy, ct::by_value>>();
+  CheckRefThreadsAndIsNotStolen<
+      curry::policy<cs::as_passed, cc::move, ct::by_value>>();
+  CheckRefThreadsAndIsNotStolen<
+      curry::policy<cs::as_passed, cc::copy, ct::by_value>>();
+}
+
+TEST(ReferenceWrapper, ThreadsMutationThroughValueStorage) {
+  int value = 0;
+  auto inc = [](int& acc) { acc += 1; };
+  // by_value + move: the wrapper is moved, the int is mutated through it.
+  curry::policy<cs::by_value, cc::move, ct::by_value>::curry(inc,
+                                                             std::ref(value))();
+  EXPECT_EQ(value, 1);
 }

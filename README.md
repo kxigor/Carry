@@ -51,6 +51,10 @@ tuple).
 | `move` | moved into the functor | passed as lvalue       | single-shot for moved args |
 | `copy` | passed as lvalue       | passed as lvalue       | yes                        |
 
+The call policy governs **stored (curried) arguments only**. Fresh call-time
+arguments are always perfect-forwarded, so a move-only argument works under any
+policy.
+
 ## Usage
 
 `curry::policy<...>` is a value-less bundle; bind it to a name and reuse it:
@@ -99,12 +103,15 @@ f(d);                               // fine — copy policy keeps storage intact
 
 These follow directly from the standard and are **preconditions**, not bugs:
 
-- **`by_reference` (or `as_passed`) + an rvalue** stores a reference to a
-  temporary whose lifetime ends at the end of the currying full-expression
-  ([class.temporary]); using the callable afterwards is a dangling reference.
-  Use these policies only with lvalues that outlive the callable.
-- **`call::copy`** delivers everything as an lvalue, including fresh call-time
-  rvalues — so it will not bind a functor parameter of type `T&&`.
+- **`by_reference` + an rvalue** stores a reference to a temporary whose lifetime
+  ends at the end of the currying full-expression ([class.temporary]); using the
+  callable afterwards is a dangling reference. Use `by_reference` only with
+  lvalues that outlive the callable.
+- **`as_passed` + an rvalue is safe** — it owns the temporary by move.
+  `as_passed` + an *lvalue* borrows it, so that lvalue must outlive the callable.
+- **`std::ref(x)`** is the explicit way to borrow through a value-storing policy:
+  the reference is threaded safely (carried inside the `reference_wrapper`) and
+  is never moved through, even under `call::move`.
 
 The test suite runs under AddressSanitizer + UBSan to catch any accidental
 violation.
