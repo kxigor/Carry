@@ -1,0 +1,144 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 25,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "CURRY_BUILD_TESTS": "ON"
+      }
+    },
+    {
+      "name": "mixin-san-address",
+      "hidden": true,
+      "cacheVariables": { "SANITIZER_MODE": "Address" }
+    },
+    {
+      "name": "mixin-san-thread",
+      "hidden": true,
+      "cacheVariables": { "SANITIZER_MODE": "Thread" }
+    },
+    {
+      "name": "mixin-san-memory",
+      "hidden": true,
+      "description": "Requires an instrumented libc++ build (set a toolchain file at the preset that uses this mixin).",
+      "cacheVariables": { "SANITIZER_MODE": "Memory" }
+    },
+    {
+      "name": "mixin-san-undefined",
+      "hidden": true,
+      "cacheVariables": { "SANITIZER_MODE": "Undefined" }
+    },
+    {
+      "name": "mixin-san-none",
+      "hidden": true,
+      "cacheVariables": { "SANITIZER_MODE": "None" }
+    },
+
+    {
+      "name": "dev-debug-asan",
+      "displayName": "Debug + Tests + Address Sanitizer",
+      "description": "Standard development build: Debug symbols + ASan + UBSan",
+      "inherits": ["base", "mixin-san-address"],
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+    },
+    {
+      "name": "dev-debug-tsan",
+      "displayName": "Debug + Tests + Thread Sanitizer",
+      "inherits": ["base", "mixin-san-thread"],
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+    },
+    {
+      "name": "dev-debug-msan",
+      "displayName": "Debug + Tests + Memory Sanitizer",
+      "inherits": ["base", "mixin-san-memory"],
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+    },
+    {
+      "name": "dev-debug-ubsan",
+      "displayName": "Debug + Tests + Only Undefined Sanitizer",
+      "inherits": ["base", "mixin-san-undefined"],
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+    },
+    {
+      "name": "ci-coverage",
+      "displayName": "Debug + UnitTests + Coverage",
+      "description" : "Build with GCOV flags. Debug build so branches and inlining stay observable. Static analysis is disabled for speed.",
+      "inherits": ["base", "mixin-san-none"],
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CURRY_ENABLE_COVERAGE": "ON",
+        "CURRY_BUILD_TESTS": "ON",
+        "CURRY_ENABLE_FORMAT_CHECK": "OFF",
+        "CURRY_ENABLE_TIDY_CHECK": "OFF"
+      }
+    },
+    {
+      "name": "ci-relwithdebinfo",
+      "displayName": "Release + Tests + Debug info",
+      "inherits": ["base", "mixin-san-none"],
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo" }
+    },
+    {
+      "name": "ci-tests-release",
+      "displayName": "Release + Tests",
+      "description": "Maximum optimization, no sanitizers, runs all tests",
+      "inherits": ["base", "mixin-san-none"],
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    },
+    {
+      "name": "ci-release",
+      "displayName": "Release",
+      "description": "Final deployment build. No testing.",
+      "inherits": ["base", "mixin-san-none"],
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CURRY_BUILD_TESTS": "OFF",
+        "CURRY_BUILD_APP": "OFF"
+      }
+    }
+  ],
+
+  "buildPresets": [
+    { "name": "dev-debug-asan", "configurePreset": "dev-debug-asan" },
+    { "name": "dev-debug-tsan", "configurePreset": "dev-debug-tsan" },
+    { "name": "dev-debug-msan", "configurePreset": "dev-debug-msan" },
+    { "name": "dev-debug-ubsan", "configurePreset": "dev-debug-ubsan" },
+    { "name": "ci-coverage", "configurePreset": "ci-coverage" },
+    { "name": "ci-tests-release", "configurePreset": "ci-tests-release" },
+    { "name": "ci-relwithdebinfo", "configurePreset": "ci-relwithdebinfo" },
+    { "name": "ci-release", "configurePreset": "ci-release" }
+  ],
+
+  "testPresets": [
+    {
+      "name": "dev-debug-asan",
+      "configurePreset": "dev-debug-asan",
+      "output": { "outputOnFailure": true },
+      "execution": { "stopOnFailure": true }
+    },
+    {
+      "name": "dev-debug-tsan",
+      "configurePreset": "dev-debug-tsan",
+      "output": { "outputOnFailure": true }
+    },
+    {
+      "name": "ci-coverage",
+      "configurePreset": "ci-coverage",
+      "output": { "outputOnFailure": true }
+    },
+    {
+      "name": "ci-tests-release",
+      "configurePreset": "ci-tests-release",
+      "output": { "outputOnFailure": true }
+    }
+  ]
+}
