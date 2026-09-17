@@ -1,5 +1,8 @@
 add_gtest(CarryUnit
-  SOURCES CarryUnit.cpp
+  SOURCES
+    CarryUnit.cpp
+    CarryContractUnit.cpp
+    CarryLifetimeUnit.cpp
   LIBRARIES
     carry::carry
     project_options

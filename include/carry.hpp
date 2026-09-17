@@ -173,6 +173,11 @@ concept storage_policy = requires(int lvalue) {
   requires detail::is_tuple<decltype(P::template store<int&>(lvalue))>::value;
 };
 
+/// @brief Constrains the @c Target parameter of @ref carry::policy.
+///        Has the same requirements as @ref storage_policy.
+template <typename P>
+concept target_policy = storage_policy<P>;
+
 /// @brief Constrains the @c Call parameter of @ref carry::policy.
 ///
 /// Satisfied by a type with a static @c forward that delivers a stored value —
@@ -188,7 +193,7 @@ concept call_policy =
 ///
 /// @tparam Storage Argument-storage policy (models @ref storage_policy).
 /// @tparam Call    Delivery policy (models @ref call_policy).
-/// @tparam Target  Functor-storage policy (models @ref storage_policy).
+/// @tparam Target  Functor-storage policy (models @ref target_policy).
 ///
 /// @code
 /// using owning = carry::policy<carry::storage::by_value,
@@ -196,7 +201,7 @@ concept call_policy =
 ///                              carry::target::by_value>;
 /// auto greet = owning::carry(fn, a, b);
 /// @endcode
-template <storage_policy Storage, call_policy Call, storage_policy Target>
+template <storage_policy Storage, call_policy Call, target_policy Target>
 struct policy {
   /// @brief Carry @p functor with leading @p curried_args.
   ///
@@ -211,12 +216,16 @@ struct policy {
   template <typename Functor, typename... CurriedArgs>
   static auto carry(Functor&& functor, CurriedArgs&&... curried_args) {
     return [
-      functor               = Target::template store<Functor>(functor),
+      functor               =  Target::template store<Functor>(functor),
       curried_args_as_tuple = Storage::template store<CurriedArgs...>(curried_args...)
     ]
-    <typename... OtherArgs>(OtherArgs&&... other_args) mutable {
+    <typename... OtherArgs> (
+      this auto&&, 
+      OtherArgs&&... other_args
+    ) 
+    -> decltype(auto) {
       return std::apply(
-        [&](auto&... stored_curried_args) {
+        [&](auto&... stored_curried_args) -> decltype(auto) {
           return Call::template forward<Functor>(std::get<0>(functor))(
             Call::template forward<CurriedArgs>(stored_curried_args)...,
             std::forward<OtherArgs>(other_args)...
