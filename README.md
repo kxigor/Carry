@@ -1,10 +1,10 @@
 # Carry
 
-A header-only C++23 library for **function currying / partial application** with
+A header-only C++23 library for **partial application** with
 explicit, composable control over **value categories** and **lifetimes**.
 
-Most currying helpers make one hard-wired choice about whether bound arguments
-are copied, moved, or referenced. Carry makes that choice a *policy* you select
+Most partial application helpers make one hard-wired choice about whether bound
+arguments are copied, moved, or referenced. Carry makes that choice a *policy* you select
 per call site. The policy controls how objects are stored and passed; the objects
 themselves may still contain borrowed references.
 
@@ -23,12 +23,12 @@ int  six   = add12(3);            // 1 + 2 + 3
 
 ## The policy model
 
-Currying behaviour is the product of three **orthogonal axes**, bundled into one
-reusable type `carry::policy<Storage, Call, Target>`:
+Partial application behaviour is the product of three **orthogonal axes**,
+bundled into one reusable type `carry::policy<Storage, Call, Target>`:
 
 | Axis        | Namespace          | Options                                  | Governs                                   |
 |-------------|--------------------|------------------------------------------|-------------------------------------------|
-| **storage** | `carry::storage`   | `by_value`, `as_passed`, `by_reference`  | how curried arguments are kept            |
+| **storage** | `carry::storage`   | `by_value`, `as_passed`, `by_reference`  | how bound arguments are kept            |
 | **call**    | `carry::call`      | `move`, `copy`                           | how stored arguments and the functor are used |
 | **target**  | `carry::target`    | `by_value`, `as_passed`, `by_reference`  | how the functor itself is kept            |
 
@@ -86,7 +86,7 @@ f(d);                             // valid if fn and the stored state permit reu
   owning::carry(add, 1, 2, 3)();    // all bound
   owning::carry(add)(1, 2, 3);      // none bound
   ```
-- **Chaining**: a curried callable is itself a functor.
+- **Chaining**: a partially applied callable is itself a functor.
   ```cpp
   auto g = owning::carry(add, 1);
   auto h = owning::carry(g, 2);

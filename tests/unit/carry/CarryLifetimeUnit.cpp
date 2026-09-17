@@ -20,7 +20,7 @@ using mixed = carry::policy<carry::storage::as_passed, carry::call::copy,
 TEST(Lifetime, OwnedArgumentAndFunctorSurviveTheirSourceScope) {
   std::weak_ptr<int> argument_lifetime;
   std::weak_ptr<int> functor_lifetime;
-  auto curried = [&] {
+  auto carried = [&] {
     auto argument = std::make_shared<int>(7);
     auto captured = std::make_shared<int>(11);
     argument_lifetime = argument;
@@ -33,7 +33,7 @@ TEST(Lifetime, OwnedArgumentAndFunctorSurviveTheirSourceScope) {
 
   EXPECT_EQ(argument_lifetime.use_count(), 1);
   EXPECT_EQ(functor_lifetime.use_count(), 1);
-  EXPECT_EQ(curried(), 18);
+  EXPECT_EQ(carried(), 18);
 }
 
 TEST(Lifetime, CopyingOwnedClosureSeparatesArgumentAndFunctorState) {
@@ -105,22 +105,22 @@ TEST(Lifetime, BorrowedTemporaryArgumentAndFunctorLastThroughImmediateCall) {
 TEST(Lifetime, BorrowingNamedXvalueDoesNotMoveOrEndItsLifetime) {
   auto value = std::make_unique<int>(7);
   auto read = [](const std::unique_ptr<int>& pointer) { return *pointer; };
-  auto curried = borrowing::carry(read, std::move(value));
+  auto carried = borrowing::carry(read, std::move(value));
 
   ASSERT_NE(value, nullptr);
-  EXPECT_EQ(curried(), 7);
+  EXPECT_EQ(carried(), 7);
   *value = 9;
-  EXPECT_EQ(curried(), 9);
+  EXPECT_EQ(carried(), 9);
 }
 
 TEST(Lifetime, ValueStoredViewDoesNotOwnItsCharacters) {
   auto owner = std::make_shared<std::string>("borrowed");
   std::weak_ptr<std::string> observer = owner;
-  auto curried =
+  auto carried =
       owning::carry([](std::string_view value) { return value.size(); },
                     std::string_view(*owner));
 
-  EXPECT_EQ(curried(), 8U);
+  EXPECT_EQ(carried(), 8U);
   EXPECT_EQ(observer.use_count(), 1);
   owner.reset();
   EXPECT_TRUE(observer.expired());
@@ -130,10 +130,10 @@ TEST(Lifetime, ValueStoredViewDoesNotOwnItsCharacters) {
 TEST(Lifetime, ValueStoredReferenceWrapperDoesNotExtendReferentLifetime) {
   auto owner = std::make_shared<int>(7);
   std::weak_ptr<int> observer = owner;
-  auto curried =
+  auto carried =
       owning::carry([](const int& value) { return value; }, std::ref(*owner));
 
-  EXPECT_EQ(curried(), 7);
+  EXPECT_EQ(carried(), 7);
   EXPECT_EQ(observer.use_count(), 1);
   owner.reset();
   EXPECT_TRUE(observer.expired());
@@ -142,7 +142,7 @@ TEST(Lifetime, ValueStoredReferenceWrapperDoesNotExtendReferentLifetime) {
 
 TEST(Lifetime, ValueStoredFunctorDoesNotOwnItsReferenceCapture) {
   std::weak_ptr<int> observer;
-  [[maybe_unused]] auto curried = [&] {
+  [[maybe_unused]] auto carried = [&] {
     auto owner = std::make_shared<int>(7);
     observer = owner;
     int& value = *owner;

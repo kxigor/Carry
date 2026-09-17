@@ -1,12 +1,12 @@
 #pragma once
 
 /// @file carry.hpp
-/// @brief Header-only function currying (partial application) with explicit,
+/// @brief Header-only function partial application with explicit,
 ///        composable control over value categories and lifetimes.
 ///
-/// Currying is configured by three orthogonal policy axes, bundled into
+/// Partial application uses three orthogonal policy axes, bundled into
 /// @ref carry::policy "policy":
-///   - **storage** — how curried arguments are kept (own vs. borrow);
+///   - **storage** — how bound arguments are kept (own vs. borrow);
 ///   - **call**    — how stored arguments are delivered to the functor;
 ///   - **target**  — how the functor itself is kept.
 ///
@@ -27,7 +27,7 @@ namespace carry {
 
 // ============================================================================
 
-/// @brief Argument-storage policies: how curried arguments become the tuple
+/// @brief Argument-storage policies: how bound arguments become the tuple
 ///        held by the returned callable.
 ///
 /// Each policy exposes a single static @c store. It receives the arguments as
@@ -73,7 +73,7 @@ struct as_passed {
 /// @brief Borrow every argument by reference.
 ///
 /// Nothing is copied or moved. Storing a reference to a temporary dangles once
-/// currying returns, so use only with lvalues that outlive the callable.
+/// carry returns, so use only with lvalues that outlive the callable.
 struct by_reference {
   /// @copydoc by_value::store
   template <typename... OriginalTypes, typename... LvalueTypes>
@@ -102,7 +102,7 @@ using storage::by_value;
 
 // ============================================================================
 
-/// @brief Call policies: how a *stored* value (a curried argument or the
+/// @brief Call policies: how a *stored* value (a bound argument or the
 ///        functor) is delivered to the functor at invocation time.
 ///
 /// Note this governs only stored values. Fresh call-time arguments are always
@@ -188,8 +188,8 @@ concept call_policy =
 
 // ============================================================================
 
-/// @brief A reusable currying configuration: one bundle of the three policy
-///        axes, invoked through @ref policy::carry.
+/// @brief A reusable partial application configuration: three policy axes,
+///        invoked through @ref policy::carry.
 ///
 /// @tparam Storage Argument-storage policy (models @ref storage_policy).
 /// @tparam Call    Delivery policy (models @ref call_policy).
@@ -203,21 +203,21 @@ concept call_policy =
 /// @endcode
 template <storage_policy Storage, call_policy Call, target_policy Target>
 struct policy {
-  /// @brief Carry @p functor with leading @p curried_args.
+  /// @brief Carry @p functor with leading @p carried_args.
   ///
   /// @tparam Functor     The callable, of any value category.
-  /// @tparam CurriedArgs The leading arguments to bind now.
+  /// @tparam CarriedArgs The leading arguments to bind now.
   /// @param  functor      Callable to partially apply (kept per @c Target).
-  /// @param  curried_args Arguments bound now (kept per @c Storage).
+  /// @param  carried_args Arguments bound now (kept per @c Storage).
   /// @return A callable that, given the remaining arguments, invokes
   ///         @p functor with the bound arguments (delivered per @c Call)
   ///         followed by the new ones (always perfect-forwarded).
   // clang-format off
-  template <typename Functor, typename... CurriedArgs>
-  static auto carry(Functor&& functor, CurriedArgs&&... curried_args) {
+  template <typename Functor, typename... CarriedArgs>
+  static auto carry(Functor&& functor, CarriedArgs&&... carried_args) {
     return [
       functor               =  Target::template store<Functor>(functor),
-      curried_args_as_tuple = Storage::template store<CurriedArgs...>(curried_args...)
+      carried_args_as_tuple = Storage::template store<CarriedArgs...>(carried_args...)
     ]
     <typename... OtherArgs> (
       this auto&&, 
@@ -225,13 +225,13 @@ struct policy {
     ) 
     -> decltype(auto) {
       return std::apply(
-        [&](auto&... stored_curried_args) -> decltype(auto) {
+        [&](auto&... stored_carried_args) -> decltype(auto) {
           return Call::template forward<Functor>(std::get<0>(functor))(
-            Call::template forward<CurriedArgs>(stored_curried_args)...,
+            Call::template forward<CarriedArgs>(stored_carried_args)...,
             std::forward<OtherArgs>(other_args)...
           );
         },
-        curried_args_as_tuple
+        carried_args_as_tuple
       );
     };
   }

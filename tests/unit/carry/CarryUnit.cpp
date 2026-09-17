@@ -57,25 +57,25 @@ constexpr auto probe_id = [](Probe p) { return p.id; };
 }  // namespace
 
 TEST(Functional, PartialApplicationIsReusableForPureFunction) {
-  auto curried = own_copy::carry(add3, 1, 2);
-  EXPECT_EQ(curried(3), 6);
-  EXPECT_EQ(curried(10), 13);
+  auto carried = own_copy::carry(add3, 1, 2);
+  EXPECT_EQ(carried(3), 6);
+  EXPECT_EQ(carried(10), 13);
 }
 
-TEST(Functional, ZeroCurriedArgs) {
-  auto curried = own_copy::carry(add3);
-  EXPECT_EQ(curried(1, 2, 3), 6);
+TEST(Functional, ZeroCarriedArgs) {
+  auto carried = own_copy::carry(add3);
+  EXPECT_EQ(carried(1, 2, 3), 6);
 }
 
-TEST(Functional, AllArgsCurried) {
-  auto curried = own_move::carry(add3, 1, 2, 3);
-  EXPECT_EQ(curried(), 6);
+TEST(Functional, AllArgsCarried) {
+  auto carried = own_move::carry(add3, 1, 2, 3);
+  EXPECT_EQ(carried(), 6);
 }
 
 TEST(Functional, ArgumentOrderIsPreserved) {
   auto sub = [](int a, int b, int c) { return a - b - c; };
-  auto curried = own_copy::carry(sub, 10, 3);
-  EXPECT_EQ(curried(2), 5);
+  auto carried = own_copy::carry(sub, 10, 3);
+  EXPECT_EQ(carried(2), 5);
 }
 
 TEST(Functional, Chaining) {
@@ -87,8 +87,8 @@ TEST(Functional, Chaining) {
 TEST(Functional, VariadicArityCombinesStoredAndFreshArguments) {
   auto count = [](auto &&...args) { return sizeof...(args); };
   std::string s = "test";
-  auto curried = own_move::carry(count, 1, std::move(s), "literal");
-  EXPECT_EQ(curried(4.0, 'c'), std::size_t{5});
+  auto carried = own_move::carry(count, 1, std::move(s), "literal");
+  EXPECT_EQ(carried(4.0, 'c'), std::size_t{5});
 }
 
 // All 18 policy combinations are observed through object identities, mutations,
@@ -165,13 +165,13 @@ TYPED_TEST(PolicyMatrix, LvalueOriginsRespectOwnershipAndRemainLvalues) {
   ObservingFunctor target;
   using policy = typename TypeParam::policy;
 
-  auto curried = policy::carry(target, argument);
+  auto carried = policy::carry(target, argument);
   const int expected_copies = static_cast<int>(TypeParam::copies_argument) +
                               static_cast<int>(TypeParam::copies_target);
   EXPECT_EQ(g.copy_ctor, expected_copies);
   EXPECT_EQ(g.move_ctor, 0);
 
-  const Delivery delivered = curried();
+  const Delivery delivered = carried();
   EXPECT_EQ(delivered.argument == &argument, !TypeParam::copies_argument);
   EXPECT_EQ(delivered.target == &target, !TypeParam::copies_target);
   EXPECT_FALSE(delivered.argument_is_rvalue);
@@ -191,15 +191,15 @@ TYPED_TEST(PolicyMatrix, RvalueOriginsRespectOwnershipAndCallPolicy) {
   using policy = typename TypeParam::policy;
 
   // std::move changes the category, not the lifetime. Named sources remain
-  // alive until after curried is destroyed, including for by_reference.
-  auto curried = policy::carry(std::move(target), std::move(argument));
+  // alive until after carried is destroyed, including for by_reference.
+  auto carried = policy::carry(std::move(target), std::move(argument));
   const int expected_moves =
       static_cast<int>(!TypeParam::borrows_rvalue_argument) +
       static_cast<int>(!TypeParam::borrows_rvalue_target);
   EXPECT_EQ(g.copy_ctor, 0);
   EXPECT_EQ(g.move_ctor, expected_moves);
 
-  const Delivery delivered = curried();
+  const Delivery delivered = carried();
   EXPECT_EQ(delivered.argument == &argument,
             TypeParam::borrows_rvalue_argument);
   EXPECT_EQ(delivered.target == &target, TypeParam::borrows_rvalue_target);
@@ -218,26 +218,26 @@ TYPED_TEST(PolicyMatrix, RvalueOriginsRespectOwnershipAndCallPolicy) {
 
 TEST(CallMove, ValueParameterConsumesOwnedRvalueOnEachCall) {
   Reset();
-  auto curried = own_move::carry(probe_id, Probe{42});
+  auto carried = own_move::carry(probe_id, Probe{42});
   EXPECT_EQ(g.copy_ctor, 0);
   EXPECT_EQ(g.move_ctor, 1);
 
-  EXPECT_EQ(curried(), 42);
+  EXPECT_EQ(carried(), 42);
   EXPECT_EQ(g.move_ctor, 2);
-  EXPECT_EQ(curried(), -1);  // the first invocation consumed the stored Probe
+  EXPECT_EQ(carried(), -1);  // the first invocation consumed the stored Probe
   EXPECT_EQ(g.move_ctor, 3);
   EXPECT_EQ(g.copy_ctor, 0);
 }
 
 TEST(CallCopy, ValueParameterCopiesOwnedRvalueOnEachCall) {
   Reset();
-  auto curried = own_copy::carry(probe_id, Probe{4});
+  auto carried = own_copy::carry(probe_id, Probe{4});
   EXPECT_EQ(g.copy_ctor, 0);
   EXPECT_EQ(g.move_ctor, 1);
 
-  EXPECT_EQ(curried(), 4);
+  EXPECT_EQ(carried(), 4);
   EXPECT_EQ(g.copy_ctor, 1);
-  EXPECT_EQ(curried(), 4);
+  EXPECT_EQ(carried(), 4);
   EXPECT_EQ(g.copy_ctor, 2);
   EXPECT_EQ(g.move_ctor, 1);
 }
@@ -264,30 +264,30 @@ constexpr Category CategoryOf() {
 }
 
 TYPED_TEST(OwningCallPolicies, FreshArgumentsPreserveCvAndValueCategories) {
-  auto curried = TypeParam::carry(
+  auto carried = TypeParam::carry(
       [](auto &&value) { return CategoryOf<decltype(value)>(); });
   int value = 1;
   const int constant = 2;
 
-  EXPECT_EQ(curried(value), Category::lvalue);
-  EXPECT_EQ(curried(constant), Category::const_lvalue);
-  EXPECT_EQ(curried(std::move(value)), Category::rvalue);
-  EXPECT_EQ(curried(std::move(constant)), Category::const_rvalue);
-  EXPECT_EQ(curried(3), Category::rvalue);
+  EXPECT_EQ(carried(value), Category::lvalue);
+  EXPECT_EQ(carried(constant), Category::const_lvalue);
+  EXPECT_EQ(carried(std::move(value)), Category::rvalue);
+  EXPECT_EQ(carried(std::move(constant)), Category::const_rvalue);
+  EXPECT_EQ(carried(3), Category::rvalue);
 }
 
 TYPED_TEST(OwningCallPolicies,
            FreshValueParameterCopiesLvaluesAndMovesRvalues) {
   Reset();
-  auto curried = TypeParam::carry(probe_id);
+  auto carried = TypeParam::carry(probe_id);
   Probe value{8};
 
-  EXPECT_EQ(curried(value), 8);
+  EXPECT_EQ(carried(value), 8);
   EXPECT_EQ(value.id, 8);
   EXPECT_EQ(g.copy_ctor, 1);
   EXPECT_EQ(g.move_ctor, 0);
 
-  EXPECT_EQ(curried(std::move(value)), 8);
+  EXPECT_EQ(carried(std::move(value)), 8);
   EXPECT_EQ(value.id, -1);
   EXPECT_EQ(g.copy_ctor, 1);
   EXPECT_EQ(g.move_ctor, 1);
@@ -299,31 +299,31 @@ TYPED_TEST(OwningCallPolicies, FreshMoveOnlyValueParameterIsAccepted) {
 }
 
 TYPED_TEST(OwningCallPolicies, MoveOnlyFunctorCanBeOwned) {
-  auto curried = TypeParam::carry(
+  auto carried = TypeParam::carry(
       [p = std::make_unique<int>(7)](int x) { return *p + x; }, 2);
-  static_assert(!std::is_copy_constructible_v<decltype(curried)>);
-  EXPECT_EQ(curried(), 9);
+  static_assert(!std::is_copy_constructible_v<decltype(carried)>);
+  EXPECT_EQ(carried(), 9);
 
-  auto moved = std::move(curried);
+  auto moved = std::move(carried);
   EXPECT_EQ(moved(), 9);
 }
 
 TYPED_TEST(OwningCallPolicies,
            StoredMoveOnlyArgumentCanBeReadWithoutConsumption) {
   auto read = [](const std::unique_ptr<int> &p) { return *p; };
-  auto curried = TypeParam::carry(read, std::make_unique<int>(11));
-  static_assert(!std::is_copy_constructible_v<decltype(curried)>);
-  EXPECT_EQ(curried(), 11);
-  EXPECT_EQ(curried(), 11);
+  auto carried = TypeParam::carry(read, std::make_unique<int>(11));
+  static_assert(!std::is_copy_constructible_v<decltype(carried)>);
+  EXPECT_EQ(carried(), 11);
+  EXPECT_EQ(carried(), 11);
 }
 
 }  // namespace
 
 TEST(CallMove, StoredMoveOnlyArgumentCanBeConsumed) {
   auto consume = [](std::unique_ptr<int> p) { return p ? *p : -1; };
-  auto curried = own_move::carry(consume, std::make_unique<int>(9));
-  EXPECT_EQ(curried(), 9);
-  EXPECT_EQ(curried(), -1);
+  auto carried = own_move::carry(consume, std::make_unique<int>(9));
+  EXPECT_EQ(carried(), 9);
+  EXPECT_EQ(carried(), -1);
 }
 
 TEST(Categories, StorageControlsConstnessOfLvalueOrigins) {
@@ -363,16 +363,16 @@ TEST(Categories, MixedLvalueRvalueWithAsPassed) {
     return a + b + c + suffix;
   };
   std::string lv = "L";
-  auto curried = pass_move::carry(cat, lv, std::string("M"), "R");
-  EXPECT_EQ(curried(std::string("!")), "LMR!");
+  auto carried = pass_move::carry(cat, lv, std::string("M"), "R");
+  EXPECT_EQ(carried(std::string("!")), "LMR!");
 }
 
 TEST(Lifetime, OwnedProbesAreReleasedWithTheClosure) {
   Reset();
   {
-    auto curried = own_copy::carry(probe_id, Probe{1});
+    auto carried = own_copy::carry(probe_id, Probe{1});
     EXPECT_EQ(g.alive, 1);
-    EXPECT_EQ(curried(), 1);
+    EXPECT_EQ(carried(), 1);
     EXPECT_EQ(g.alive, 1);
   }
   EXPECT_EQ(g.alive, 0);
@@ -388,16 +388,16 @@ void CheckRefThreadsAndIsNotStolen() {
   Probe p{10};
   auto wrapper = std::ref(p);
   // A value parameter makes an accidental move through the wrapper observable.
-  auto curried = Policy::carry(probe_id, std::move(wrapper));
+  auto carried = Policy::carry(probe_id, std::move(wrapper));
   EXPECT_EQ(g.copy_ctor, 0);
   EXPECT_EQ(g.move_ctor, 0);
 
-  EXPECT_EQ(curried(), 10);
+  EXPECT_EQ(carried(), 10);
   EXPECT_EQ(p.id, 10);
   EXPECT_EQ(g.copy_ctor, 1);
   EXPECT_EQ(g.move_ctor, 0);
 
-  EXPECT_EQ(curried(), 10);
+  EXPECT_EQ(carried(), 10);
   EXPECT_EQ(p.id, 10);
   EXPECT_EQ(g.copy_ctor, 2);
   EXPECT_EQ(g.move_ctor, 0);
@@ -424,18 +424,18 @@ TYPED_TEST(OwningCallPolicies,
            ReferenceWrapperThreadsMutationThroughOwnedStorage) {
   int value = 10;
   auto inc = [](int &acc, int delta) { acc += delta; };
-  auto curried = TypeParam::carry(inc, std::ref(value), 5);
-  curried();
+  auto carried = TypeParam::carry(inc, std::ref(value), 5);
+  carried();
   EXPECT_EQ(value, 15);
-  curried();
+  carried();
   EXPECT_EQ(value, 20);
 }
 
 TYPED_TEST(OwningCallPolicies, ConstReferenceWrapperPreservesReferentIdentity) {
   const int value = 42;
   auto address = [](const int &arg) { return &arg; };
-  auto curried = TypeParam::carry(address, std::cref(value));
-  EXPECT_EQ(curried(), &value);
+  auto carried = TypeParam::carry(address, std::cref(value));
+  EXPECT_EQ(carried(), &value);
 }
 
 }  // namespace
