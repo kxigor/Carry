@@ -1,21 +1,21 @@
 #pragma once
 
-/// @file curry.hpp
+/// @file carry.hpp
 /// @brief Header-only function currying (partial application) with explicit,
 ///        composable control over value categories and lifetimes.
 ///
 /// Currying is configured by three orthogonal policy axes, bundled into
-/// @ref curry::policy "policy":
+/// @ref carry::policy "policy":
 ///   - **storage** — how curried arguments are kept (own vs. borrow);
 ///   - **call**    — how stored arguments are delivered to the functor;
 ///   - **target**  — how the functor itself is kept.
 ///
 /// @code
-/// using fast = curry::policy<curry::storage::by_value,
-///                            curry::call::move,
-///                            curry::target::by_value>;
+/// using fast = carry::policy<carry::storage::by_value,
+///                            carry::call::move,
+///                            carry::target::by_value>;
 /// auto add   = [](int a, int b, int c) { return a + b + c; };
-/// auto add12 = fast::curry(add, 1, 2);
+/// auto add12 = fast::carry(add, 1, 2);
 /// int  six   = add12(3);  // 1 + 2 + 3
 /// @endcode
 
@@ -23,7 +23,7 @@
 #include <type_traits>
 #include <utility>
 
-namespace curry {
+namespace carry {
 
 // ============================================================================
 
@@ -88,7 +88,7 @@ struct by_reference {
 
 /// @brief Functor-storage policies.
 ///
-/// The functor is held as a one-element tuple, so the @ref curry::storage
+/// The functor is held as a one-element tuple, so the @ref carry::storage
 /// mechanism applies verbatim. The names are re-exported for intent:
 /// @c target::by_value owns the functor, @c target::by_reference borrows it,
 /// @c target::as_passed mirrors how it was supplied.
@@ -162,21 +162,21 @@ struct is_tuple<std::tuple<Ts...>> : std::true_type {};
 /// @endcond
 
 /// @brief Constrains the @c Storage and @c Target parameters of
-///        @ref curry::policy.
+///        @ref carry::policy.
 ///
 /// Satisfied by a type with a static @c store mapping arguments to a
-/// @c std::tuple — i.e. the @ref curry::storage policies and their
-/// @ref curry::target re-exports.
+/// @c std::tuple — i.e. the @ref carry::storage policies and their
+/// @ref carry::target re-exports.
 template <typename P>
 concept storage_policy = requires(int lvalue) {
   { P::template store<int&>(lvalue) };
   requires detail::is_tuple<decltype(P::template store<int&>(lvalue))>::value;
 };
 
-/// @brief Constrains the @c Call parameter of @ref curry::policy.
+/// @brief Constrains the @c Call parameter of @ref carry::policy.
 ///
 /// Satisfied by a type with a static @c forward that delivers a stored value —
-/// i.e. the @ref curry::call policies.
+/// i.e. the @ref carry::call policies.
 template <typename P>
 concept call_policy =
     requires(int lvalue) { P::template forward<int&>(lvalue); };
@@ -184,21 +184,21 @@ concept call_policy =
 // ============================================================================
 
 /// @brief A reusable currying configuration: one bundle of the three policy
-///        axes, invoked through @ref policy::curry.
+///        axes, invoked through @ref policy::carry.
 ///
 /// @tparam Storage Argument-storage policy (models @ref storage_policy).
 /// @tparam Call    Delivery policy (models @ref call_policy).
 /// @tparam Target  Functor-storage policy (models @ref storage_policy).
 ///
 /// @code
-/// using owning = curry::policy<curry::storage::by_value,
-///                              curry::call::copy,
-///                              curry::target::by_value>;
-/// auto greet = owning::curry(fn, a, b);
+/// using owning = carry::policy<carry::storage::by_value,
+///                              carry::call::copy,
+///                              carry::target::by_value>;
+/// auto greet = owning::carry(fn, a, b);
 /// @endcode
 template <storage_policy Storage, call_policy Call, storage_policy Target>
 struct policy {
-  /// @brief Curry @p functor with leading @p curried_args.
+  /// @brief Carry @p functor with leading @p curried_args.
   ///
   /// @tparam Functor     The callable, of any value category.
   /// @tparam CurriedArgs The leading arguments to bind now.
@@ -209,7 +209,7 @@ struct policy {
   ///         followed by the new ones (always perfect-forwarded).
   // clang-format off
   template <typename Functor, typename... CurriedArgs>
-  static auto curry(Functor&& functor, CurriedArgs&&... curried_args) {
+  static auto carry(Functor&& functor, CurriedArgs&&... curried_args) {
     return [
       functor               = Target::template store<Functor>(functor),
       curried_args_as_tuple = Storage::template store<CurriedArgs...>(curried_args...)
@@ -229,4 +229,4 @@ struct policy {
   // clang-format on
 };
 
-}  // namespace curry
+}  // namespace carry

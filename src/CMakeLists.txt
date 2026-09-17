@@ -1,16 +1,16 @@
 # =========================================================
-# curry — header-only library target
+# carry — header-only library target
 # =========================================================
-# No compiled sources: the whole library lives in include/curry.hpp.
-# Consumers (tests, app, downstream projects) link `curry::curry` to pull in
+# No compiled sources: the whole library lives in include/carry.hpp.
+# Consumers (tests, app, downstream projects) link `carry::carry` to pull in
 # the include path and the required C++ standard.
 
-add_library(curry INTERFACE)
-add_library(curry::curry ALIAS curry)
+add_library(carry INTERFACE)
+add_library(carry::carry ALIAS carry)
 
-target_include_directories(curry INTERFACE
+target_include_directories(carry INTERFACE
   $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
 )
 
-target_compile_features(curry INTERFACE cxx_std_23)
+target_compile_features(carry INTERFACE cxx_std_23)

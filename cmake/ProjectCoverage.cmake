@@ -7,7 +7,7 @@
 # using GCC/Clang (GCOV/LCOV format).
 # 
 # It creates the 'project_coverage' INTERFACE library to conditionally apply 
-# coverage flags only when the CURRY_ENABLE_COVERAGE option is ON. This allows 
+# coverage flags only when the CARRY_ENABLE_COVERAGE option is ON. This allows
 # linking against 'project_coverage' without affecting the build when coverage 
 # is disabled (the library becomes a no-op).
 
@@ -19,7 +19,7 @@ add_library(project_coverage INTERFACE)
 # ========================================
 # 2. CONDITIONAL FLAG APPLICATION & TOOLS
 # ========================================
-if(CURRY_ENABLE_COVERAGE)
+if(CARRY_ENABLE_COVERAGE)
   # Use the standard GCC/Clang flag which enables both instrumentation and 
   # branch coverage features (-fprofile-arcs, -ftest-coverage).
   set(COVERAGE_FLAGS "--coverage")

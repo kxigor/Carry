@@ -1,5 +1,5 @@
 // =============================================================================
-// CurryUnit — value-category & lifetime coverage for curry::policy.
+// CarryUnit — value-category & lifetime coverage for carry::policy.
 //
 // The three policy axes are exercised independently and in combination:
 //
@@ -24,7 +24,7 @@
 #include <utility>
 #include <vector>
 
-#include "curry.hpp"
+#include "carry.hpp"
 
 namespace {
 
@@ -94,17 +94,17 @@ struct Probe {
 //   target::by_value      -> own_*, pass_*
 //   target::by_reference  -> ref_*, functor_ref
 // ----------------------------------------------------------------------------
-namespace cs = curry::storage;
-namespace cc = curry::call;
-namespace ct = curry::target;
+namespace cs = carry::storage;
+namespace cc = carry::call;
+namespace ct = carry::target;
 
-using own_move = curry::policy<cs::by_value, cc::move, ct::by_value>;
-using own_copy = curry::policy<cs::by_value, cc::copy, ct::by_value>;
-using pass_move = curry::policy<cs::as_passed, cc::move, ct::by_value>;
-using pass_copy = curry::policy<cs::as_passed, cc::copy, ct::by_value>;
-using ref_move = curry::policy<cs::by_reference, cc::move, ct::by_reference>;
-using ref_copy = curry::policy<cs::by_reference, cc::copy, ct::by_reference>;
-using functor_ref = curry::policy<cs::by_value, cc::copy, ct::by_reference>;
+using own_move = carry::policy<cs::by_value, cc::move, ct::by_value>;
+using own_copy = carry::policy<cs::by_value, cc::copy, ct::by_value>;
+using pass_move = carry::policy<cs::as_passed, cc::move, ct::by_value>;
+using pass_copy = carry::policy<cs::as_passed, cc::copy, ct::by_value>;
+using ref_move = carry::policy<cs::by_reference, cc::move, ct::by_reference>;
+using ref_copy = carry::policy<cs::by_reference, cc::copy, ct::by_reference>;
+using functor_ref = carry::policy<cs::by_value, cc::copy, ct::by_reference>;
 
 // Plain test functors (no Probe members -> they do not perturb the counters).
 constexpr auto add3 = [](int a, int b, int c) { return a + b + c; };
@@ -117,36 +117,36 @@ constexpr auto probe_id = [](Probe p) { return p.id; };
 // =============================================================================
 
 TEST(Functional, PartialThenComplete) {
-  auto curried = own_copy::curry(add3, 1, 2);
+  auto curried = own_copy::carry(add3, 1, 2);
   EXPECT_EQ(curried(3), 6);
 }
 
 TEST(Functional, ReusableUnderCopyPolicy) {
-  auto curried = own_copy::curry(add3, 1, 2);
+  auto curried = own_copy::carry(add3, 1, 2);
   EXPECT_EQ(curried(3), 6);
   EXPECT_EQ(curried(10), 13);
   EXPECT_EQ(curried(100), 103);
 }
 
 TEST(Functional, ZeroCurriedArgs) {
-  auto curried = own_copy::curry(add3);
+  auto curried = own_copy::carry(add3);
   EXPECT_EQ(curried(1, 2, 3), 6);
 }
 
 TEST(Functional, AllArgsCurried) {
-  auto curried = own_move::curry(add3, 1, 2, 3);
+  auto curried = own_move::carry(add3, 1, 2, 3);
   EXPECT_EQ(curried(), 6);
 }
 
 TEST(Functional, ArgumentOrderIsPreserved) {
   auto sub = [](int a, int b, int c) { return a - b - c; };
-  auto curried = own_copy::curry(sub, 10, 3);
+  auto curried = own_copy::carry(sub, 10, 3);
   EXPECT_EQ(curried(2), 5);  // 10 - 3 - 2
 }
 
 TEST(Functional, Chaining) {
-  auto c1 = own_copy::curry(add3, 1);
-  auto c2 = own_copy::curry(c1, 2);
+  auto c1 = own_copy::carry(add3, 1);
+  auto c2 = own_copy::carry(c1, 2);
   EXPECT_EQ(c2(3), 6);
 }
 
@@ -155,7 +155,7 @@ TEST(Functional, StatefulFunctionObject) {
     int factor;
     int operator()(int a, int b) const { return a * b * factor; }
   };
-  auto curried = own_copy::curry(Multiplier{2}, 3);
+  auto curried = own_copy::carry(Multiplier{2}, 3);
   EXPECT_EQ(curried(4), 24);
 }
 
@@ -169,7 +169,7 @@ TEST(StorageByValue, LvalueIsCopiedIn) {
   const int copies = g.copy_ctor;
   const int moves = g.move_ctor;
 
-  auto curried = own_copy::curry(probe_id, lv);
+  auto curried = own_copy::carry(probe_id, lv);
 
   EXPECT_EQ(g.copy_ctor - copies, 1);  // owned: lvalue copied into storage
   EXPECT_EQ(g.move_ctor - moves, 0);
@@ -180,7 +180,7 @@ TEST(StorageByValue, RvalueIsMovedIn) {
   Reset();
   const int copies = g.copy_ctor;
 
-  auto curried = own_move::curry(probe_id, Probe{2});
+  auto curried = own_move::carry(probe_id, Probe{2});
 
   EXPECT_EQ(g.copy_ctor - copies, 0);  // never copied
   EXPECT_GE(g.move_ctor, 1);           // moved into storage
@@ -193,7 +193,7 @@ TEST(StorageAsPassed, LvalueIsBorrowedNotCopied) {
   const int copies = g.copy_ctor;
   const int moves = g.move_ctor;
 
-  auto curried = pass_copy::curry(probe_id, lv);
+  auto curried = pass_copy::carry(probe_id, lv);
 
   EXPECT_EQ(g.copy_ctor - copies, 0);  // stored by reference: no copy
   EXPECT_EQ(g.move_ctor - moves, 0);
@@ -204,7 +204,7 @@ TEST(StorageAsPassed, RvalueIsOwnedByMove) {
   Reset();
   const int copies = g.copy_ctor;
 
-  auto curried = pass_move::curry(probe_id, Probe{9});
+  auto curried = pass_move::carry(probe_id, Probe{9});
 
   EXPECT_EQ(g.copy_ctor - copies, 0);
   EXPECT_GE(g.move_ctor, 1);  // rvalue moved into storage
@@ -217,7 +217,7 @@ TEST(StorageByReference, NothingIsCopiedOrMoved) {
   const int copies = g.copy_ctor;
   const int moves = g.move_ctor;
 
-  auto curried = ref_copy::curry(probe_id, lv);
+  auto curried = ref_copy::carry(probe_id, lv);
 
   EXPECT_EQ(g.copy_ctor - copies, 0);
   EXPECT_EQ(g.move_ctor - moves, 0);
@@ -230,7 +230,7 @@ TEST(StorageByReference, NothingIsCopiedOrMoved) {
 
 TEST(CallMove, RvalueArgIsNeverCopied_StoreThenCallBothMove) {
   Reset();
-  auto curried = own_move::curry(probe_id, Probe{5});
+  auto curried = own_move::carry(probe_id, Probe{5});
   const int moves_after_store = g.move_ctor;
 
   const int result = curried();
@@ -242,7 +242,7 @@ TEST(CallMove, RvalueArgIsNeverCopied_StoreThenCallBothMove) {
 
 TEST(CallMove, ConsumesStorage_SingleShot) {
   Reset();
-  auto curried = own_move::curry(probe_id, Probe{42});
+  auto curried = own_move::carry(probe_id, Probe{42});
 
   EXPECT_EQ(curried(), 42);  // first call moves the stored Probe out
   EXPECT_EQ(curried(), -1);  // storage is now moved-from (observably consumed)
@@ -251,7 +251,7 @@ TEST(CallMove, ConsumesStorage_SingleShot) {
 TEST(CallCopy, CopiesIntoFunctor_Reusable) {
   Reset();
   Probe lv{4};
-  auto curried = own_copy::curry(probe_id, lv);  // +1 copy at store
+  auto curried = own_copy::carry(probe_id, lv);  // +1 copy at store
   const int copies_after_store = g.copy_ctor;
 
   EXPECT_EQ(curried(), 4);
@@ -270,7 +270,7 @@ TEST(ReferenceSemantics, AsPassedThreadsLvalueByReference) {
   Probe p{1};
   auto bump = [](Probe& q) { q.id += 10; };
 
-  pass_copy::curry(bump, p)();
+  pass_copy::carry(bump, p)();
 
   EXPECT_EQ(p.id, 11);  // the caller's object was mutated
 }
@@ -280,7 +280,7 @@ TEST(ReferenceSemantics, ByValueIsolatesTheCaller) {
   Probe p{1};
   auto bump = [](Probe& q) { q.id += 10; };
 
-  own_copy::curry(bump, p)();
+  own_copy::carry(bump, p)();
 
   EXPECT_EQ(p.id, 1);  // only the owned copy changed
 }
@@ -290,7 +290,7 @@ TEST(ReferenceSemantics, ByReferenceThreadsAddress) {
   Probe p{1};
   auto address_of = [](const Probe& q) { return &q; };
 
-  auto curried = ref_copy::curry(address_of, p);
+  auto curried = ref_copy::carry(address_of, p);
 
   EXPECT_EQ(curried(), &p);  // same object, zero-copy passthrough
 }
@@ -302,7 +302,7 @@ TEST(ReferenceSemantics, ReferenceWrapperSurvivesValueStorage) {
     return acc;
   };
 
-  auto curried = own_copy::curry(inc, std::ref(value), 5);
+  auto curried = own_copy::carry(inc, std::ref(value), 5);
 
   EXPECT_EQ(curried(), 15);
   EXPECT_EQ(value, 15);  // reference_wrapper kept the reference alive
@@ -317,7 +317,7 @@ TEST(FunctorStorage, ByValueCopiesTheFunctor) {
   auto fn = [captured = Probe{0}](int x) { return x + captured.id; };
   const int copies = g.copy_ctor;
 
-  auto curried = own_copy::curry(fn, 1);
+  auto curried = own_copy::carry(fn, 1);
 
   EXPECT_EQ(g.copy_ctor - copies, 1);  // functor (and its Probe) copied in
   EXPECT_EQ(curried(), 1);
@@ -328,7 +328,7 @@ TEST(FunctorStorage, ByReferenceDoesNotCopyTheFunctor) {
   auto fn = [captured = Probe{0}](int x) { return x + captured.id; };
   const int copies = g.copy_ctor;
 
-  auto curried = functor_ref::curry(fn, 1);
+  auto curried = functor_ref::carry(fn, 1);
 
   EXPECT_EQ(g.copy_ctor - copies, 0);  // functor borrowed, not copied
   EXPECT_EQ(curried(), 1);
@@ -341,18 +341,18 @@ TEST(FunctorStorage, RefQualifiedDeliveryFollowsOriginalCategory) {
   };
 
   RefQual lvalue_fn;
-  EXPECT_EQ(own_move::curry(lvalue_fn)(), 1);  // lvalue functor -> operator()&
-  EXPECT_EQ(own_move::curry(RefQual{})(), 2);  // rvalue functor -> operator()&&
-  EXPECT_EQ(own_copy::curry(RefQual{})(), 1);  // copy policy always lvalue
+  EXPECT_EQ(own_move::carry(lvalue_fn)(), 1);  // lvalue functor -> operator()&
+  EXPECT_EQ(own_move::carry(RefQual{})(), 2);  // rvalue functor -> operator()&&
+  EXPECT_EQ(own_copy::carry(RefQual{})(), 1);  // copy policy always lvalue
 }
 
 TEST(FunctorStorage, AsPassedBorrowsLvalueFunctor) {
   Reset();
   auto fn = [captured = Probe{0}](int x) { return x + captured.id; };
-  using pol = curry::policy<cs::by_value, cc::copy, ct::as_passed>;
+  using pol = carry::policy<cs::by_value, cc::copy, ct::as_passed>;
   const int copies = g.copy_ctor;
 
-  auto curried = pol::curry(fn, 1);  // lvalue functor -> borrowed by reference
+  auto curried = pol::carry(fn, 1);  // lvalue functor -> borrowed by reference
 
   EXPECT_EQ(g.copy_ctor - copies, 0);
   EXPECT_EQ(curried(), 1);
@@ -360,10 +360,10 @@ TEST(FunctorStorage, AsPassedBorrowsLvalueFunctor) {
 
 TEST(FunctorStorage, AsPassedOwnsRvalueFunctorByMove) {
   Reset();
-  using pol = curry::policy<cs::by_value, cc::copy, ct::as_passed>;
+  using pol = carry::policy<cs::by_value, cc::copy, ct::as_passed>;
   const int copies = g.copy_ctor;
 
-  auto curried = pol::curry([captured = Probe{5}]() { return captured.id; });
+  auto curried = pol::carry([captured = Probe{5}]() { return captured.id; });
 
   EXPECT_EQ(g.copy_ctor - copies, 0);  // rvalue functor never copied
   EXPECT_GE(g.move_ctor, 1);           // moved into storage
@@ -376,7 +376,7 @@ TEST(FunctorStorage, AsPassedOwnsRvalueFunctorByMove) {
 
 TEST(OtherArgs, MovePolicyPerfectForwards) {
   Reset();
-  auto curried = own_move::curry(probe_id);  // no curried args
+  auto curried = own_move::carry(probe_id);  // no curried args
 
   const int before = g.move_ctor;
   EXPECT_EQ(curried(Probe{8}), 8);  // rvalue call-arg is moved into the param
@@ -386,7 +386,7 @@ TEST(OtherArgs, MovePolicyPerfectForwards) {
 
 TEST(OtherArgs, MovePolicyLeavesLvaluesAsCopies) {
   Reset();
-  auto curried = own_move::curry(probe_id);
+  auto curried = own_move::carry(probe_id);
   Probe lv{8};
 
   const int copies = g.copy_ctor;
@@ -396,7 +396,7 @@ TEST(OtherArgs, MovePolicyLeavesLvaluesAsCopies) {
 
 TEST(OtherArgs, FreshArgsArePerfectForwardedUnderCopyPolicy) {
   Reset();
-  auto curried = own_copy::curry(probe_id);  // copy policy
+  auto curried = own_copy::carry(probe_id);  // copy policy
 
   const int copies = g.copy_ctor;
   const int moves = g.move_ctor;
@@ -409,8 +409,8 @@ TEST(OtherArgs, MoveOnlyArgWorksUnderEveryCallPolicy) {
   auto deref = [](std::unique_ptr<int> p) { return *p; };
   // A move-only call-time argument must be accepted regardless of call policy,
   // because fresh args are perfect-forwarded, not routed through the policy.
-  EXPECT_EQ(own_move::curry(deref)(std::make_unique<int>(5)), 5);
-  EXPECT_EQ(own_copy::curry(deref)(std::make_unique<int>(7)), 7);
+  EXPECT_EQ(own_move::carry(deref)(std::make_unique<int>(5)), 5);
+  EXPECT_EQ(own_copy::carry(deref)(std::make_unique<int>(7)), 7);
 }
 
 // =============================================================================
@@ -419,17 +419,17 @@ TEST(OtherArgs, MoveOnlyArgWorksUnderEveryCallPolicy) {
 
 TEST(Categories, ConstLvalueIsAccepted) {
   const int konst = 100;
-  auto curried = own_copy::curry(add3, konst, 200);
+  auto curried = own_copy::carry(add3, konst, 200);
   EXPECT_EQ(curried(300), 600);
 }
 
 TEST(Categories, PrvalueAndXvalueStrings) {
   auto cat = [](std::string a, std::string b) { return a + b; };
 
-  EXPECT_EQ(own_move::curry(cat, std::string("pr"), "value")(), "prvalue");
+  EXPECT_EQ(own_move::carry(cat, std::string("pr"), "value")(), "prvalue");
 
   std::string x = "x";
-  EXPECT_EQ(own_move::curry(cat, std::move(x), "value")(), "xvalue");
+  EXPECT_EQ(own_move::carry(cat, std::move(x), "value")(), "xvalue");
 }
 
 TEST(Categories, MixedLvalueRvalueWithAsPassed) {
@@ -437,7 +437,7 @@ TEST(Categories, MixedLvalueRvalueWithAsPassed) {
     return a + b + c;
   };
   std::string lv = "L";
-  auto curried = pass_move::curry(cat, lv, std::string("M"), "R");
+  auto curried = pass_move::carry(cat, lv, std::string("M"), "R");
   EXPECT_EQ(curried(), "LMR");
 }
 
@@ -448,7 +448,7 @@ TEST(Categories, MixedLvalueRvalueWithAsPassed) {
 TEST(Lifetime, OwnedProbesAreReleasedWithTheClosure) {
   Reset();
   {
-    auto curried = own_copy::curry(probe_id, Probe{1});
+    auto curried = own_copy::carry(probe_id, Probe{1});
     EXPECT_GT(g.alive, 0);  // the stored copy is alive here
     EXPECT_EQ(curried(), 1);
   }
@@ -458,7 +458,7 @@ TEST(Lifetime, OwnedProbesAreReleasedWithTheClosure) {
 TEST(Lifetime, PerfectForwardingPassthroughArity) {
   auto count = [](auto&&... args) { return sizeof...(args); };
   std::string s = "test";
-  auto curried = own_move::curry(count, 1, std::move(s), "literal");
+  auto curried = own_move::carry(count, 1, std::move(s), "literal");
   EXPECT_EQ(curried(4.0, 'c'), std::size_t{5});
 }
 
@@ -472,12 +472,12 @@ namespace {
 
 template <typename Storage, typename Call, typename Target>
 void RunInvariant() {
-  using pol = curry::policy<Storage, Call, Target>;
+  using pol = carry::policy<Storage, Call, Target>;
   auto add = [](int a, int b, int c) { return a + b + c; };
   int x = 1;
   int y = 2;
   int z = 3;
-  auto curried = pol::curry(add, x, y);  // add, x, y are all lvalues
+  auto curried = pol::carry(add, x, y);  // add, x, y are all lvalues
   EXPECT_EQ(curried(z), 6) << "failed invariant instantiation";
 }
 
@@ -522,7 +522,7 @@ template <typename Policy>
 void CheckRefThreadsAndIsNotStolen() {
   Probe p{10};
   auto read_id = [](const Probe& q) { return q.id; };
-  auto curried = Policy::curry(read_id, std::ref(p));
+  auto curried = Policy::carry(read_id, std::ref(p));
 
   EXPECT_EQ(curried(), 10);  // the functor sees the referent
   EXPECT_EQ(p.id, 10);       // and it was NOT moved-from
@@ -536,20 +536,20 @@ TEST(ReferenceWrapper, NotStolenAcrossStorageAndCall) {
   // excluded by precondition. Every owning/borrowing-by-value combination must
   // thread the reference without stealing it.
   CheckRefThreadsAndIsNotStolen<
-      curry::policy<cs::by_value, cc::move, ct::by_value>>();
+      carry::policy<cs::by_value, cc::move, ct::by_value>>();
   CheckRefThreadsAndIsNotStolen<
-      curry::policy<cs::by_value, cc::copy, ct::by_value>>();
+      carry::policy<cs::by_value, cc::copy, ct::by_value>>();
   CheckRefThreadsAndIsNotStolen<
-      curry::policy<cs::as_passed, cc::move, ct::by_value>>();
+      carry::policy<cs::as_passed, cc::move, ct::by_value>>();
   CheckRefThreadsAndIsNotStolen<
-      curry::policy<cs::as_passed, cc::copy, ct::by_value>>();
+      carry::policy<cs::as_passed, cc::copy, ct::by_value>>();
 }
 
 TEST(ReferenceWrapper, ThreadsMutationThroughValueStorage) {
   int value = 0;
   auto inc = [](int& acc) { acc += 1; };
   // by_value + move: the wrapper is moved, the int is mutated through it.
-  curry::policy<cs::by_value, cc::move, ct::by_value>::curry(inc,
+  carry::policy<cs::by_value, cc::move, ct::by_value>::carry(inc,
                                                              std::ref(value))();
   EXPECT_EQ(value, 1);
 }

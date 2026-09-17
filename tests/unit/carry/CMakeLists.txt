@@ -1,7 +1,7 @@
-add_gtest(CurryUnit
-  SOURCES CurryUnit.cpp
+add_gtest(CarryUnit
+  SOURCES CarryUnit.cpp
   LIBRARIES
-    curry::curry
+    carry::carry
     project_options
     project_sanitizers
     project_coverage

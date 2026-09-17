@@ -5,7 +5,7 @@ cmake_minimum_required(VERSION 3.25)
 # =========================================================
 # Search & replace the two placeholder tokens in this repository:
 #
-#   curry  →  your-project-name        (used in project() and paths)
+#   carry  →  your-project-name        (used in project() and paths)
 #   MYPROJ                →  YOUR_PROJECT_UPPER       (option/cache prefix, uppercase)
 #
 # Files touched: CMakeLists.txt, CMakePresets.json, tests/CMakeLists.txt,
@@ -15,11 +15,11 @@ cmake_minimum_required(VERSION 3.25)
 # A one-liner if you trust sed (run from the repo root):
 #   NEW=myproject; NEW_UPPER=$(echo "$NEW" | tr 'a-z-' 'A-Z_'); \
 #     git ls-files | xargs sed -i \
-#       -e "s/curry/$NEW/g" \
-#       -e "s/CURRY_/${NEW_UPPER}_/g"
+#       -e "s/carry/$NEW/g" \
+#       -e "s/CARRY_/${NEW_UPPER}_/g"
 # =========================================================
 
-project(curry LANGUAGES CXX) # TODO: your project name
+project(carry LANGUAGES CXX) # TODO: your project name
 
 # =========================================================
 # 0. STANDALONE vs SUBPROJECT
@@ -30,25 +30,25 @@ project(curry LANGUAGES CXX) # TODO: your project name
 # default.
 
 if(PROJECT_IS_TOP_LEVEL)
-  set(CURRY_DEV_DEFAULT ON)
+  set(CARRY_DEV_DEFAULT ON)
 else()
-  set(CURRY_DEV_DEFAULT OFF)
+  set(CARRY_DEV_DEFAULT OFF)
 endif()
 
 # =========================================================
-# 1. OPTIONS (prefix with CURRY_ — rename to keep the cache name unique)
+# 1. OPTIONS (prefix with CARRY_ — rename to keep the cache name unique)
 # =========================================================
-option(CURRY_BUILD_APP           "Build the example app"             ${CURRY_DEV_DEFAULT})
-option(CURRY_BUILD_TESTS         "Build the GTest test suite"        ${CURRY_DEV_DEFAULT})
-option(CURRY_ENABLE_FORMAT_CHECK "Register clang-format as CTest"    ${CURRY_DEV_DEFAULT})
-option(CURRY_ENABLE_TIDY_CHECK   "Register clang-tidy as CTest"      ${CURRY_DEV_DEFAULT})
-option(CURRY_ENABLE_COVERAGE     "Enable gcov/lcov coverage targets" OFF)
+option(CARRY_BUILD_APP           "Build the example app"             ${CARRY_DEV_DEFAULT})
+option(CARRY_BUILD_TESTS         "Build the GTest test suite"        ${CARRY_DEV_DEFAULT})
+option(CARRY_ENABLE_FORMAT_CHECK "Register clang-format as CTest"    ${CARRY_DEV_DEFAULT})
+option(CARRY_ENABLE_TIDY_CHECK   "Register clang-tidy as CTest"      ${CARRY_DEV_DEFAULT})
+option(CARRY_ENABLE_COVERAGE     "Enable gcov/lcov coverage targets" OFF)
 
 # Format/tidy/coverage only make sense alongside tests.
-if(NOT CURRY_BUILD_TESTS)
-  set(CURRY_ENABLE_FORMAT_CHECK OFF CACHE BOOL "Disabled: requires CURRY_BUILD_TESTS=ON" FORCE)
-  set(CURRY_ENABLE_TIDY_CHECK   OFF CACHE BOOL "Disabled: requires CURRY_BUILD_TESTS=ON" FORCE)
-  set(CURRY_ENABLE_COVERAGE     OFF CACHE BOOL "Disabled: requires CURRY_BUILD_TESTS=ON" FORCE)
+if(NOT CARRY_BUILD_TESTS)
+  set(CARRY_ENABLE_FORMAT_CHECK OFF CACHE BOOL "Disabled: requires CARRY_BUILD_TESTS=ON" FORCE)
+  set(CARRY_ENABLE_TIDY_CHECK   OFF CACHE BOOL "Disabled: requires CARRY_BUILD_TESTS=ON" FORCE)
+  set(CARRY_ENABLE_COVERAGE     OFF CACHE BOOL "Disabled: requires CARRY_BUILD_TESTS=ON" FORCE)
 endif()
 
 # =========================================================
@@ -75,18 +75,18 @@ add_subdirectory(src)
 # =========================================================
 # 4. DEV-ONLY MACHINERY (skipped for subproject consumers)
 # =========================================================
-if(CURRY_BUILD_APP OR CURRY_BUILD_TESTS OR CURRY_ENABLE_COVERAGE)
+if(CARRY_BUILD_APP OR CARRY_BUILD_TESTS OR CARRY_ENABLE_COVERAGE)
   list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
   include(ProjectOptions)
   include(ProjectSanitizers)
   include(ProjectCoverage)
 endif()
 
-if(CURRY_BUILD_APP)
+if(CARRY_BUILD_APP)
   add_subdirectory(app)
 endif()
 
-if(CURRY_BUILD_TESTS)
+if(CARRY_BUILD_TESTS)
   enable_testing()
   add_subdirectory(tests)
 endif()

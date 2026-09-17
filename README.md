@@ -1,120 +1,133 @@
-# Curry
+# Carry
 
 A header-only C++23 library for **function currying / partial application** with
 explicit, composable control over **value categories** and **lifetimes**.
 
 Most currying helpers make one hard-wired choice about whether bound arguments
-are copied, moved, or referenced. Curry makes that choice a *policy* you select
-per call site, so ownership is honest and visible in the type.
+are copied, moved, or referenced. Carry makes that choice a *policy* you select
+per call site. The policy controls how objects are stored and passed; the objects
+themselves may still contain borrowed references.
 
 ```cpp
-#include "curry.hpp"
+#include "carry.hpp"
 
 auto add = [](int a, int b, int c) { return a + b + c; };
 
-using fast = curry::policy<curry::storage::by_value,
-                           curry::call::move,
-                           curry::target::by_value>;
+using fast = carry::policy<carry::storage::by_value,
+                           carry::call::move,
+                           carry::target::by_value>;
 
-auto add12 = fast::curry(add, 1, 2);
+auto add12 = fast::carry(add, 1, 2);
 int  six   = add12(3);            // 1 + 2 + 3
 ```
 
 ## The policy model
 
 Currying behaviour is the product of three **orthogonal axes**, bundled into one
-reusable type `curry::policy<Storage, Call, Target>`:
+reusable type `carry::policy<Storage, Call, Target>`:
 
 | Axis        | Namespace          | Options                                  | Governs                                   |
 |-------------|--------------------|------------------------------------------|-------------------------------------------|
-| **storage** | `curry::storage`   | `by_value`, `as_passed`, `by_reference`  | how curried arguments are kept            |
-| **call**    | `curry::call`      | `move`, `copy`                           | how stored arguments reach the functor    |
-| **target**  | `curry::target`    | `by_value`, `as_passed`, `by_reference`  | how the functor itself is kept            |
+| **storage** | `carry::storage`   | `by_value`, `as_passed`, `by_reference`  | how curried arguments are kept            |
+| **call**    | `carry::call`      | `move`, `copy`                           | how stored arguments and the functor are used |
+| **target**  | `carry::target`    | `by_value`, `as_passed`, `by_reference`  | how the functor itself is kept            |
 
 That is `3 × 2 × 3 = 18` distinct, well-defined configurations.
 
 ### storage / target — own vs. borrow
 
-| Policy         | lvalue argument            | rvalue argument        |
-|----------------|----------------------------|------------------------|
-| `by_value`     | copied (owned)             | moved (owned)          |
-| `as_passed`    | referenced (borrowed)      | moved (owned)          |
-| `by_reference` | referenced (borrowed)      | referenced (borrowed)  |
+| Policy         | lvalue argument       | rvalue argument               |
+|----------------|-----------------------|-------------------------------|
+| `by_value`     | copied (owned value)  | owned value, moved if possible |
+| `as_passed`    | referenced (borrowed) | owned value, moved if possible |
+| `by_reference` | referenced (borrowed) | referenced (borrowed)         |
 
 `target` uses the same mechanism for the functor (it is held as a one-element
-tuple).
+tuple). Owning a stored value does not imply owning everything it refers to;
+`by_value` also decays arrays and functions to pointers.
 
-### call — deliver by move vs. by copy
+### call — deliver as rvalue vs. lvalue
 
-| Policy | rvalue-origin argument | lvalue-origin argument | Reusable?                  |
-|--------|------------------------|------------------------|----------------------------|
-| `move` | moved into the functor | passed as lvalue       | single-shot for moved args |
-| `copy` | passed as lvalue       | passed as lvalue       | yes                        |
+| Policy | rvalue-origin stored object | lvalue-origin stored object |
+|--------|-----------------------------|-----------------------------|
+| `move` | cast to an rvalue            | used as an lvalue           |
+| `copy` | used as an lvalue            | used as an lvalue           |
 
-The call policy governs **stored (curried) arguments only**. Fresh call-time
-arguments are always perfect-forwarded, so a move-only argument works under any
-policy.
+The call policy governs **stored arguments and the functor itself**, including
+selection of its `operator() &` or `operator() &&`. Casting to an rvalue does not
+itself move anything; consumption depends on the invoked function. Likewise,
+`copy` supplies lvalues rather than making copies: the function can mutate or move
+from them. Neither policy guarantees that repeating a call preserves its result
+or remains valid.
+
+Fresh call-time arguments are always perfect-forwarded, regardless of the call
+policy; the function must accept the resulting argument types and categories.
 
 ## Usage
 
-`curry::policy<...>` is a value-less bundle; bind it to a name and reuse it:
+`carry::policy<...>` is a value-less bundle; bind it to a name and reuse it:
 
 ```cpp
-namespace cs = curry::storage;
-namespace cc = curry::call;
-namespace ct = curry::target;
+namespace cs = carry::storage;
+namespace cc = carry::call;
+namespace ct = carry::target;
 
-using owning  = curry::policy<cs::by_value,     cc::copy, ct::by_value>;
-using piping  = curry::policy<cs::as_passed,    cc::move, ct::by_value>;
-using viewing = curry::policy<cs::by_reference, cc::copy, ct::by_reference>;
+using owning  = carry::policy<cs::by_value,     cc::copy, ct::by_value>;
+using piping  = carry::policy<cs::as_passed,    cc::move, ct::by_value>;
+using viewing = carry::policy<cs::by_reference, cc::copy, ct::by_reference>;
 
-auto f = owning::curry(fn, a, b);   // owns a, b; reusable
+auto f = owning::carry(fn, a, b);   // stores decayed copies of fn, a, b
 f(c);
-f(d);                               // fine — copy policy keeps storage intact
+f(d);                             // valid if fn and the stored state permit reuse
 ```
 
 - **Partial application** of any arity, including all-or-none:
   ```cpp
-  owning::curry(add, 1, 2, 3)();    // all bound
-  owning::curry(add)(1, 2, 3);      // none bound
+  owning::carry(add, 1, 2, 3)();    // all bound
+  owning::carry(add)(1, 2, 3);      // none bound
   ```
 - **Chaining**: a curried callable is itself a functor.
   ```cpp
-  auto g = owning::curry(add, 1);
-  auto h = owning::curry(g, 2);
+  auto g = owning::carry(add, 1);
+  auto h = owning::carry(g, 2);
   h(3);                             // 6
   ```
 - **References** survive value storage via `std::reference_wrapper`:
   ```cpp
   int acc = 0;
-  owning::curry(accumulate, std::ref(acc), 5)();   // mutates acc
+  owning::carry(accumulate, std::ref(acc), 5)();   // mutates acc
   ```
 
 ## Choosing a policy
 
-- **Default / safe**: `by_value, copy, by_value` — owns everything, reusable,
-  never dangles.
-- **Pipelines / sinks**: `as_passed, move, by_value` — the "honest" ownership:
-  temporaries are owned and moved through, named objects are borrowed.
+- **Own stored values**: `by_value, copy, by_value` — stores arguments and the
+  functor by value and uses them as lvalues. References inside them remain borrowed.
+- **Pipelines / sinks**: `as_passed, move, by_value` — owns rvalue arguments and
+  presents them as rvalues on invocation; borrows lvalue arguments.
 - **Continuations / immediate use**: `by_reference, …` — zero-copy, but the
   callable must not outlive what it borrows.
 
 ## Lifetime caveats
 
-These follow directly from the standard and are **preconditions**, not bugs:
+- **Ownership is shallow.** Storing a pointer, `std::string_view`, `std::span`,
+  `std::reference_wrapper`, or a lambda with reference captures by value does not
+  extend the lifetime of its referents. Keep those referents alive and valid for
+  every call that accesses them.
+- **`by_reference` does not extend lifetimes.** A temporary passed directly to
+  `carry` normally dies at the end of that full-expression, not when `carry`
+  returns. Immediate invocation within the same expression can be valid; a later
+  call through the stored reference is not. `std::move(x)` instead refers to the
+  existing object `x`: its lifetime is unchanged, and borrowing it does not itself
+  move from it. This applies to borrowed functors too.
+- **`as_passed` owns rvalue arguments and borrows lvalue arguments.** An owned
+  value can still contain borrowed references; an lvalue referent must remain
+  alive and valid while used by the callable.
+- **`std::ref(x)` explicitly borrows `x`.** Value storage preserves the wrapper;
+  moving that wrapper under `call::move` does not itself move from `x`. The invoked
+  function can still mutate or move from `x`.
 
-- **`by_reference` + an rvalue** stores a reference to a temporary whose lifetime
-  ends at the end of the currying full-expression ([class.temporary]); using the
-  callable afterwards is a dangling reference. Use `by_reference` only with
-  lvalues that outlive the callable.
-- **`as_passed` + an rvalue is safe** — it owns the temporary by move.
-  `as_passed` + an *lvalue* borrows it, so that lvalue must outlive the callable.
-- **`std::ref(x)`** is the explicit way to borrow through a value-storing policy:
-  the reference is threaded safely (carried inside the `reference_wrapper`) and
-  is never moved through, even under `call::move`.
-
-The test suite runs under AddressSanitizer + UBSan to catch any accidental
-violation.
+The Debug sanitizer preset runs tests under AddressSanitizer + UBSan. These can
+detect lifetime violations exercised by tests, but do not prove lifetime safety.
 
 ## Requirements
 
@@ -140,15 +153,15 @@ ctest --test-dir build/ci-coverage
 As a header-only dependency, link the interface target:
 
 ```cmake
-add_subdirectory(Curry)
-target_link_libraries(your_target PRIVATE curry::curry)
+add_subdirectory(Carry)
+target_link_libraries(your_target PRIVATE carry::carry)
 ```
 
 ## Layout
 
 ```
-include/curry.hpp            the library (Doxygen-documented public interface)
-tests/unit/curry/            value-category & lifetime unit tests
+include/carry.hpp            the library (Doxygen-documented public interface)
+tests/unit/carry/            value-category & lifetime unit tests
 docs/coverage-proof.md       formal argument that the suite covers every case
 cmake/, CMakePresets.json    build system
 ```

@@ -1,1 +1,1 @@
-add_subdirectory(curry)
+add_subdirectory(carry)

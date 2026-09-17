@@ -13,7 +13,7 @@
       "binaryDir": "${sourceDir}/build/${presetName}",
       "cacheVariables": {
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-        "CURRY_BUILD_TESTS": "ON"
+        "CARRY_BUILD_TESTS": "ON"
       }
     },
     {
@@ -75,10 +75,10 @@
       "inherits": ["base", "mixin-san-none"],
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "CURRY_ENABLE_COVERAGE": "ON",
-        "CURRY_BUILD_TESTS": "ON",
-        "CURRY_ENABLE_FORMAT_CHECK": "OFF",
-        "CURRY_ENABLE_TIDY_CHECK": "OFF"
+        "CARRY_ENABLE_COVERAGE": "ON",
+        "CARRY_BUILD_TESTS": "ON",
+        "CARRY_ENABLE_FORMAT_CHECK": "OFF",
+        "CARRY_ENABLE_TIDY_CHECK": "OFF"
       }
     },
     {
@@ -101,8 +101,8 @@
       "inherits": ["base", "mixin-san-none"],
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "CURRY_BUILD_TESTS": "OFF",
-        "CURRY_BUILD_APP": "OFF"
+        "CARRY_BUILD_TESTS": "OFF",
+        "CARRY_BUILD_APP": "OFF"
       }
     }
   ],
